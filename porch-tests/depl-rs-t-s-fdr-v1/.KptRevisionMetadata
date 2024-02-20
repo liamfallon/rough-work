@@ -1,8 +1,0 @@
-apiVersion: ""
-kind: KptRevisionMetadata
-metadata:
-  name: edge1-1ed6e7a2b88e4e87604717a5b8fbe661480a5247
-  namespace: porch-demo
-  creationTimestamp: "2024-02-20T12:57:32Z"
-  resourceVersion: df284c13ccc8909d2d987d821994cf1478878f24
-  uid: uid:depl-rs-t-s-fdr:v1
