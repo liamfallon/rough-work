@@ -17,5 +17,5 @@ upgrade:
 interval: 10m
 timeout: 2m
 values:
-  app-value-1: "custom-value-1"
-  app-value-2: "custom-value-2"
+  app-value-1: "new-default-value-1"
+  app-value-2: "default-value-2"

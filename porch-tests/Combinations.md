@@ -1,14 +1,3 @@
-# Delete all
-```
-porchctl rpkg list -A | egrep -v '(external|REPOSITORY)'| awk '{printf("porchctl rpkg propose-delete %s -n porch-demo\n", $2)}' > ~/tmp/aaa
-source ~/tmp/aaa
-porchctl rpkg list -A | egrep -v '(external|REPOSITORY)'| awk '{printf("porchctl rpkg delete %s -n porch-demo\n", $2)}' > ~/tmp/aaa
-source ~/tmp/aaa
-
-find . -type d -name 'bp*' -exec rm -fr {} \;
-find . -type d -name 'depl*' -exec rm -fr {} \;
-```
-
 # Create blueprints
 
 ## Create blueprint v1 (replay strategy true)
@@ -237,6 +226,7 @@ porchctl rpkg update edge1-1b32709a7f4fcd1e14d689489a1c2269c87b6591 --revision=v
 
 Error: upstream source not found for package rev "depl-rs-f-s-fdr"; only cloned packages can be updated 
 ```
+
 # Reproduce bug
 
 ## Create blueprint v1
@@ -258,7 +248,7 @@ porchctl rpkg copy management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9  --worksp
 
 porchctl rpkg pull management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
 
-cp demo-app-1-bp-v2.yaml bp-v2/demo-app-1.yaml
+cp demo-app-1-bp-v2-value-fail.yaml bp-v2/demo-app-1.yaml
 
 porchctl rpkg push management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
 
@@ -292,3 +282,190 @@ porchctl rpkg update edge1-1ebfa3e4ef95d04744d5069743cd350d910d743e --revision=v
 
 Error: upstream source not found for package rev "depl"; only cloned packages can be updated 
 ```
+
+# Bug scenario with no blueprint change 
+
+## Create blueprint v1
+```
+porchctl rpkg init bp --workspace v1 --repository management -n porch-demo
+
+porchctl rpkg pull management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+cp demo-app-1-bp-v1.yaml bp-v1/demo-app-1.yaml
+
+porchctl rpkg push management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+porchctl rpkg propose management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+porchctl rpkg approve management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+```
+## Create blueprint v2
+```
+porchctl rpkg copy management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9  --workspace v2 -n porch-demo
+
+porchctl rpkg pull management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+porchctl rpkg propose management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+porchctl rpkg approve management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+```
+## Create deployment v1
+```
+porchctl rpkg clone management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 depl --repository edge1 --workspace v1 -n porch-demo
+
+porchctl rpkg pull edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+cp demo-app-1-depl.yaml depl-v1/demo-app-1.yaml
+
+porchctl rpkg push edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+porchctl rpkg propose edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+porchctl rpkg approve edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+```
+## Upgrade deployment v1
+```
+porchctl rpkg copy edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo --replay-strategy=true --workspace=v2
+porchctl rpkg update edge1-1ebfa3e4ef95d04744d5069743cd350d910d743e --revision=v2
+```
+This works fine.
+
+# Bug scenario with blueprint parameter change (fails)
+
+## Create blueprint v1
+```
+porchctl rpkg init bp --workspace v1 --repository management -n porch-demo
+
+porchctl rpkg pull management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+cp demo-app-1-bp-v1.yaml bp-v1/demo-app-1.yaml
+
+porchctl rpkg push management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+porchctl rpkg propose management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+porchctl rpkg approve management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+```
+## Create blueprint v2
+```
+porchctl rpkg copy management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9  --workspace v2 -n porch-demo
+
+porchctl rpkg pull management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+
+cp demo-app-1-bp-v2-new-par-fail.yaml bp-v2/demo-app-1.yaml
+
+porchctl rpkg push management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+
+porchctl rpkg propose management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+porchctl rpkg approve management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+```
+## Create deployment v1
+```
+porchctl rpkg clone management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 depl --repository edge1 --workspace v1 -n porch-demo
+
+porchctl rpkg pull edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+cp demo-app-1-depl.yaml depl-v1/demo-app-1.yaml
+
+porchctl rpkg push edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+porchctl rpkg propose edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+porchctl rpkg approve edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+```
+## Upgrade deployment v1
+```
+porchctl rpkg copy edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo --replay-strategy=true --workspace=v2
+porchctl rpkg update edge1-1ebfa3e4ef95d04744d5069743cd350d910d743e --revision=v2
+Error: Internal error occurred: error applying patch: conflict: fragment line does not match src line 
+```
+
+# Bug scenario with blueprint parameter change (works)
+
+## Create blueprint v1
+```
+porchctl rpkg init bp --workspace v1 --repository management -n porch-demo
+
+porchctl rpkg pull management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+cp demo-app-1-bp-v1.yaml bp-v1/demo-app-1.yaml
+
+porchctl rpkg push management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+porchctl rpkg propose management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+porchctl rpkg approve management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+```
+## Create blueprint v2
+```
+porchctl rpkg copy management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 --replay-strategy=true --workspace v2 -n porch-demo
+
+porchctl rpkg pull management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+
+cp demo-app-1-bp-v2-new-par-ok.yaml bp-v2/demo-app-1.yaml
+
+porchctl rpkg push management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+
+porchctl rpkg propose management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+porchctl rpkg approve management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+```
+## Create deployment v1
+```
+porchctl rpkg clone management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 depl --repository edge1 --workspace v1 -n porch-demo
+
+porchctl rpkg pull edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+cp demo-app-1-depl.yaml depl-v1/demo-app-1.yaml
+
+porchctl rpkg push edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+porchctl rpkg propose edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+porchctl rpkg approve edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+```
+## Upgrade deployment v1
+```
+porchctl rpkg copy edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo --replay-strategy=true --workspace=v2
+porchctl rpkg update edge1-1ebfa3e4ef95d04744d5069743cd350d910d743e --revision=v2
+```
+This works
+
+# Bug scenario with blueprint parameter change (works)
+
+## Create blueprint v1
+```
+porchctl rpkg init bp --workspace v1 --repository management -n porch-demo
+
+porchctl rpkg pull management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+cp demo-app-1-bp-v1.yaml bp-v1/demo-app-1.yaml
+
+porchctl rpkg push management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 bp-v1 -n porch-demo
+
+porchctl rpkg propose management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+porchctl rpkg approve management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 -n porch-demo
+```
+## Create blueprint v2
+```
+porchctl rpkg copy management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9  --workspace v2 -n porch-demo --replay-strategy=true
+
+porchctl rpkg pull management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+
+cp demo-app-1-bp-v2-new-par-test.yaml bp-v2/demo-app-1.yaml
+
+porchctl rpkg push management-8f9d314ce0ed3718910880812c193fd041771e1a bp-v2 -n porch-demo
+
+porchctl rpkg propose management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+porchctl rpkg approve management-8f9d314ce0ed3718910880812c193fd041771e1a -n porch-demo
+```
+## Create deployment v1
+```
+porchctl rpkg clone management-08f3186a5068f90c7873cf2a9b6c56fdc64dcac9 depl --repository edge1 --workspace v1 -n porch-demo
+
+porchctl rpkg pull edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+cp demo-app-1-depl.yaml depl-v1/demo-app-1.yaml
+
+porchctl rpkg push edge1-721f9963e8b7461f5a53aa614e03baded3de791a depl-v1 -n porch-demo
+
+porchctl rpkg propose edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+porchctl rpkg approve edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo
+```
+## Upgrade deployment v1
+```
+porchctl rpkg copy edge1-721f9963e8b7461f5a53aa614e03baded3de791a -n porch-demo --replay-strategy=true --workspace=v2
+porchctl rpkg update edge1-1ebfa3e4ef95d04744d5069743cd350d910d743e --revision=v2
+```
+This works

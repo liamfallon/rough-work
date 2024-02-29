@@ -19,4 +19,4 @@ timeout: 2m
 values:
   app-value-1: "new-default-value-1"
   app-value-2: "default-value-2"
-  app-value-rs-false: "This is a test of false"
+  app-value-3: "default-value-3"
