@@ -1,0 +1,55 @@
+# Test Blueprint v1
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint
+  nameSpace: porch-demo
+  resourceVersion: v1
+  annotations:
+    package-name: network-function
+data:
+  app-par-1: "default-value-1"
+  app-par-2: "default-value-2"
+---
+# Test Deployment v1
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment
+  nameSpace: porch-demo
+  resourceVersion: v1
+  annotations:
+    package-name: deployed-network-function
+    clone-strategy: resource-merge
+data:
+  app-par-1: "custom-value-1"
+  app-par-2: "custom-value-2"
+---
+# Test Blueprint v2
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint
+  nameSpace: porch-demo
+  resourceVersion: v2
+  annotations:
+    package-name: network-function
+    replay-strategy: "true"
+data:
+  app-par-1: "default-value-1"
+  app-par-2: "default-value-2"
+  app-par-3: "default-value-3"
+---
+# Test Deployment v2
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment
+  nameSpace: porch-demo
+  resourceVersion: v2
+  annotations:
+    package-name: deployed-network-function
+data:
+  app-par-1: "custom-value-1"
+  app-par-2: "custom-value-2"
+  app-par-3: "default-value-3"
