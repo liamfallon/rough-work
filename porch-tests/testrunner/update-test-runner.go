@@ -1,4 +1,4 @@
-package porchtests
+package testrunner
 
 import (
 	"bytes"
@@ -14,119 +14,110 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-type TestContext struct {
-	testFile       string
-	yamlByteArrays []byte
-	testConfigMaps []corev1.ConfigMap
-}
+func ParseTestFile(testYamlFile string) (TestContext, error) {
+	ctx := TestContext{}
 
-var ctx TestContext
-
-func main() {
-	Execute(ctx)
-}
-
-func ParseTestFile(testYamlFile string) error {
-	yamlByteArrays, err := splitYamlFile(testYamlFile)
+	var err error
+	ctx.yamlByteArrays, err = splitYamlFile(testYamlFile)
 	if err != nil {
 		log.Fatalf("Failed to read yaml file %s : %v", testYamlFile, err)
-		return err
+		return ctx, err
 	}
 
-	if len(yamlByteArrays) != 4 {
-		errMsg := fmt.Sprintf("Test yaml file %s must contain 4 ConfigMap entries, it contains %d ConfigMap entries", testYamlFile, len(yamlByteArrays))
+	if len(ctx.yamlByteArrays) != 4 {
+		errMsg := fmt.Sprintf("Test yaml file %s must contain 4 ConfigMap entries, it contains %d ConfigMap entries", testYamlFile, len(ctx.yamlByteArrays))
 		log.Fatalln(errMsg)
-		return errors.New(errMsg)
+		return ctx, errors.New(errMsg)
 	}
 
 	testConfigMaps := []corev1.ConfigMap{}
 
 	for i := 0; i < 4; i++ {
-		err := yaml.Unmarshal(yamlByteArrays[i], &testConfigMaps[i])
+		err := yaml.Unmarshal(ctx.yamlByteArrays[i], &testConfigMaps[i])
 		if err != nil {
 			fmt.Println(err)
-			return err
+			return ctx, err
 		}
 	}
 
-	return nil
+	return ctx, nil
 }
 
-func Run(testConfigMaps []corev1.ConfigMap, expectedResult string) {
-	err := createBlueprint(testConfigMaps[0])
+func Run(ctx TestContext) {
+	err := createBlueprint(ctx.testConfigMaps[0])
 	if err != nil {
 		return
 	}
 
-	err = pullPushPackage(testConfigMaps[0])
+	err = pullPushPackage(ctx.testConfigMaps[0])
 	if err != nil {
 		return
 	}
 
-	err = proposeApprovePackage(testConfigMaps[0])
+	err = proposeApprovePackage(ctx.testConfigMaps[0])
 	if err != nil {
 		return
 	}
 
-	err = clonePackage(testConfigMaps[0].Annotations["package-rev"], testConfigMaps[1])
+	err = clonePackage(ctx.testConfigMaps[0].Annotations["package-rev"], ctx.testConfigMaps[1])
 	if err != nil {
 		return
 	}
 
-	err = pullPushPackage(testConfigMaps[1])
+	err = pullPushPackage(ctx.testConfigMaps[1])
 	if err != nil {
 		return
 	}
 
-	err = proposeApprovePackage(testConfigMaps[1])
+	err = proposeApprovePackage(ctx.testConfigMaps[1])
 	if err != nil {
 		return
 	}
 
-	err = copyPackage(testConfigMaps[0].Annotations["package-rev"], testConfigMaps[2])
+	err = copyPackage(ctx.testConfigMaps[0].Annotations["package-rev"], ctx.testConfigMaps[2])
 	if err != nil {
 		return
 	}
 
-	err = pullPushPackage(testConfigMaps[2])
+	err = pullPushPackage(ctx.testConfigMaps[2])
 	if err != nil {
 		return
 	}
 
-	err = proposeApprovePackage(testConfigMaps[2])
+	err = proposeApprovePackage(ctx.testConfigMaps[2])
 	if err != nil {
 		return
 	}
 
-	err = copyPackage(testConfigMaps[1].Annotations["package-rev"], testConfigMaps[3])
+	err = copyPackage(ctx.testConfigMaps[1].Annotations["package-rev"], ctx.testConfigMaps[3])
 	if err != nil {
 		return
 	}
 
-	err = updatePackage(testConfigMaps[3])
+	err = updatePackage(ctx.testConfigMaps[3])
 	if err != nil {
 		return
 	}
 
-	err = proposeApprovePackage(testConfigMaps[3])
+	err = proposeApprovePackage(ctx.testConfigMaps[3])
 	if err != nil {
 		return
 	}
 
-	err = pullCheckPackage(testConfigMaps[3], expectedResult)
+	err = pullCheckPackage(ctx.testConfigMaps[3], string(ctx.yamlByteArrays[3]))
 	if err != nil {
 		return
 	}
 
-	DeleteAllPackages(testConfigMaps)
+	DeleteAllPackages(ctx)
 }
 
-func DeleteAllPackages(testConfigMaps []corev1.ConfigMap) {
+func DeleteAllPackages(ctx TestContext) {
 	for i := 0; i < 4; i++ {
-		pkgRevs := getPackageRevs4Package(testConfigMaps[i])
+		pkgRevs := getPackageRevs4Package(ctx.testConfigMaps[i])
 
 		for _, pkgRev := range pkgRevs {
-			deletePackage(testConfigMaps[i].GetNamespace(), pkgRev)
+			deletePackage(ctx.testConfigMaps[i].GetNamespace(), pkgRev)
 			fmt.Println(pkgRev)
 		}
 	}

@@ -4,7 +4,7 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"liamfallon/rough-work/porchtests/testrunner"
 
 	"github.com/spf13/cobra"
 )
@@ -14,8 +14,16 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the porch test",
 	Long:  `Run the porch test described in the test-file`,
+	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("run called")
+		testFile, err := cmd.Flags().GetString("test-file")
+		if err != nil {
+			return
+		}
+		ctx, err := testrunner.ParseTestFile(testFile)
+		if err == nil {
+			testrunner.Run(ctx)
+		}
 	},
 }
 
