@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"porch-tests/cmd"
 	"reflect"
 	"strings"
 
@@ -24,7 +23,7 @@ type TestContext struct {
 var ctx TestContext
 
 func main() {
-	cmd.Execute(ctx)
+	Execute(ctx)
 }
 
 func ParseTestFile(testYamlFile string) error {

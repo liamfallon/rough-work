@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	porchTests "github.com/liamfallon/rough-work/tree/main/porchTests"
+	porchtests "github.com/liamfallon/rough-work/porchtests"
 
 	"github.com/spf13/cobra"
 )
@@ -16,13 +16,13 @@ var rootCmd = &cobra.Command{
 	Long:  `This command runs or cleans up after the porch test specified in the test yaml file`,
 }
 
-func Execute(ctx porchTests.testContext) {
+func Execute(ctx porchtests.testContext) {
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}
 
-	porchTests.DeleteAllPackages()
+	porchtests.DeleteAllPackages()
 }
 
 func init() {
