@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"liamfallon/rough-work/porchtests/testrunner"
+	testRunner "liamfallon/rough-work/porch-tests/test-runner"
 
 	"github.com/spf13/cobra"
 )
@@ -16,9 +16,9 @@ var cleanCmd = &cobra.Command{
 		if err != nil {
 			return
 		}
-		ctx, err := testrunner.ParseTestFile(testFile)
+		ctx, err := testRunner.ParseTestFile(testFile)
 		if err == nil {
-			testrunner.DeleteAllPackages(ctx)
+			testRunner.DeleteAllPackages(ctx)
 		}
 	},
 }

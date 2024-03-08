@@ -4,7 +4,7 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"liamfallon/rough-work/porchtests/testrunner"
+	testRunner "liamfallon/rough-work/porch-tests/test-runner"
 
 	"github.com/spf13/cobra"
 )
@@ -20,9 +20,9 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return
 		}
-		ctx, err := testrunner.ParseTestFile(testFile)
+		ctx, err := testRunner.ParseTestFile(testFile)
 		if err == nil {
-			testrunner.Run(ctx)
+			testRunner.Run(ctx)
 		}
 	},
 }

@@ -1,4 +1,4 @@
-package testrunner
+package testRunner
 
 import (
 	"bytes"

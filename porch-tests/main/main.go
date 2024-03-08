@@ -1,7 +1,7 @@
 package main
 
 import (
-	"liamfallon/rough-work/porchtests/cmd"
+	"liamfallon/rough-work/porch-tests/cmd"
 )
 
 func main() {

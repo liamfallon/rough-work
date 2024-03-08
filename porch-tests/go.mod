@@ -1,4 +1,4 @@
-module liamfallon/rough-work/porchtests
+module liamfallon/rough-work/porch-tests
 
 go 1.21.6
 
