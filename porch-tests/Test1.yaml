@@ -1,55 +1,61 @@
 # Test Blueprint v1
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: blueprint
-  nameSpace: porch-demo
-  resourceVersion: v1
-  annotations:
-    package-name: network-function
 data:
   app-par-1: "default-value-1"
   app-par-2: "default-value-2"
+kind: ConfigMap
+metadata:
+  name: my-nf
+  nameSpace: porch-demo
+  annotations:
+    resource-name: test-resource
+    package-name: network-function
+    package-repo: management
+    workspace: v1
 ---
 # Test Deployment v1
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: deployment
-  nameSpace: porch-demo
-  resourceVersion: v1
-  annotations:
-    package-name: deployed-network-function
-    clone-strategy: resource-merge
 data:
   app-par-1: "custom-value-1"
   app-par-2: "custom-value-2"
+kind: ConfigMap
+metadata:
+  name: my-nf
+  nameSpace: porch-demo
+  annotations:
+    resource-name: test-resource
+    package-name: deployed-network-function
+    package-repo: edge1
+    workspace: v1
+    clone-strategy: resource-merge
 ---
 # Test Blueprint v2
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: blueprint
-  nameSpace: porch-demo
-  resourceVersion: v2
-  annotations:
-    package-name: network-function
-    replay-strategy: "true"
 data:
   app-par-1: "default-value-1"
   app-par-2: "default-value-2"
-  app-par-3: "default-value-3"
+kind: ConfigMap
+metadata:
+  name: my-nf
+  nameSpace: porch-demo
+  annotations:
+    resource-name: test-resource
+    package-name: network-function
+    workspace: v2
+    replay-strategy: "true"
 ---
 # Test Deployment v2
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: deployment
-  nameSpace: porch-demo
-  resourceVersion: v2
-  annotations:
-    package-name: deployed-network-function
 data:
   app-par-1: "custom-value-1"
   app-par-2: "custom-value-2"
-  app-par-3: "default-value-3"
+kind: ConfigMap
+metadata:
+  name: my-nf
+  nameSpace: porch-demo
+  annotations:
+    resource-name: test-resource
+    package-name: deployed-network-function
+    workspace: v2
+    revision: v2
+    replay-strategy: "true"

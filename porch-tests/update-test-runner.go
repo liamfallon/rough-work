@@ -1,47 +1,60 @@
-package main
+package porchTests
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"porch-tests/cmd"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 )
 
-func main() {
-	testYamlFile := "Test1.yaml"
+type TestContext struct {
+	testFile       string
+	yamlByteArrays []byte
+	testConfigMaps []corev1.ConfigMap
+}
 
+var ctx testContext
+
+func main() {
+	cmd.Execute(ctx)
+}
+
+func ParseTestFile(testYamlFile string) error {
 	yamlByteArrays, err := splitYamlFile(testYamlFile)
 	if err != nil {
 		log.Fatalf("Failed to read yaml file %s : %v", testYamlFile, err)
-		return
+		return err
 	}
 
 	if len(yamlByteArrays) != 4 {
-		log.Fatalf("Test yaml file %s must contain 4 ConfigMap entries, it contains %d ConfigMap entries", testYamlFile, len(yamlByteArrays))
-		return
+		errMsg := fmt.Sprintf("Test yaml file %s must contain 4 ConfigMap entries, it contains %d ConfigMap entries", testYamlFile, len(yamlByteArrays))
+		log.Fatalln(errMsg)
+		return errors.New(errMsg)
 	}
 
-	testConfigMaps := [4]corev1.ConfigMap{}
+	testConfigMaps := []corev1.ConfigMap{}
 
 	for i := 0; i < 4; i++ {
 		err := yaml.Unmarshal(yamlByteArrays[i], &testConfigMaps[i])
 		if err != nil {
-			log.Fatalf("Failed to unmarshal ConfigMap %d", i)
-			return
+			fmt.Println(err)
+			return err
 		}
 	}
 
-	if len(os.Args) > 1 {
-		deleteAllPackages(testConfigMaps)
-		return
-	}
+	return nil
+}
 
-	err = createBlueprint(testConfigMaps[0])
+func Run(testConfigMaps []corev1.ConfigMap, expectedResult string) {
+	err := createBlueprint(testConfigMaps[0])
 	if err != nil {
 		return
 	}
@@ -85,6 +98,256 @@ func main() {
 	if err != nil {
 		return
 	}
+
+	err = copyPackage(testConfigMaps[1].Annotations["package-rev"], testConfigMaps[3])
+	if err != nil {
+		return
+	}
+
+	err = updatePackage(testConfigMaps[3])
+	if err != nil {
+		return
+	}
+
+	err = proposeApprovePackage(testConfigMaps[3])
+	if err != nil {
+		return
+	}
+
+	err = pullCheckPackage(testConfigMaps[3], expectedResult)
+	if err != nil {
+		return
+	}
+
+	DeleteAllPackages(testConfigMaps)
+}
+
+func DeleteAllPackages(testConfigMaps []corev1.ConfigMap) {
+	for i := 0; i < 4; i++ {
+		pkgRevs := getPackageRevs4Package(testConfigMaps[i])
+
+		for _, pkgRev := range pkgRevs {
+			deletePackage(testConfigMaps[i].GetNamespace(), pkgRev)
+			fmt.Println(pkgRev)
+		}
+	}
+}
+
+func createBlueprint(pkgCm corev1.ConfigMap) error {
+	stdout, stderr, err := commandInShell(
+		"porchctl rpkg init " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			pkgCm.Annotations["package-name"] +
+			" --repository " + pkgCm.Annotations["package-repo"] +
+			" --workspace " + pkgCm.Annotations["workspace"])
+	if err != nil {
+		log.Printf("error: %v", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("stdout:" + stdout)
+
+	pkgCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
+	return nil
+}
+
+func pullPushPackage(pkgCm corev1.ConfigMap) error {
+	pullDir, err := os.MkdirTemp("", "porch")
+	if err != nil {
+		log.Printf("error: %v", err)
+		return err
+	}
+
+	defer os.RemoveAll(pullDir)
+
+	pullPackagePath := pullDir + "/" + pkgCm.Annotations["package-name"]
+
+	_, stderr, err := commandInShell(
+		"porchctl rpkg pull " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			pkgCm.Annotations["package-rev"] + " " +
+			pullPackagePath)
+	if err != nil {
+		log.Printf("error: %v\n", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("package pulled to " + pullPackagePath)
+
+	if err = addConfigMapToPackage(pkgCm, pullPackagePath); err != nil {
+		return err
+	}
+
+	_, stderr, err = commandInShell(
+		"porchctl rpkg push " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			pkgCm.Annotations["package-rev"] + " " +
+			pullPackagePath)
+	if err != nil {
+		log.Printf("error: %v\n", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("package pushed from " + pullPackagePath)
+
+	return nil
+}
+
+func clonePackage(sourcePackageRev string, pkgCm corev1.ConfigMap) error {
+	stdout, stderr, err := commandInShell(
+		"porchctl rpkg clone " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			sourcePackageRev + " " +
+			pkgCm.Annotations["package-name"] +
+			" --repository " + pkgCm.Annotations["package-repo"] +
+			" --workspace " + pkgCm.Annotations["workspace"] +
+			" --strategy " + pkgCm.Annotations["clone-strategy"])
+	if err != nil {
+		log.Printf("error: %v", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("stdout:" + stdout)
+
+	pkgCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
+	return nil
+}
+
+func copyPackage(sourcePackageRev string, pkgCm corev1.ConfigMap) error {
+	stdout, stderr, err := commandInShell(
+		"porchctl rpkg copy " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			sourcePackageRev +
+			" --workspace " + pkgCm.Annotations["workspace"] +
+			" --replay-strategy=" + pkgCm.Annotations["replay-strategy"])
+	if err != nil {
+		log.Printf("error: %v", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("stdout:" + stdout)
+
+	pkgCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
+	return nil
+}
+
+func updatePackage(pkgCm corev1.ConfigMap) error {
+	stdout, stderr, err := commandInShell(
+		"porchctl rpkg update " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			pkgCm.Annotations["package-rev"] +
+			" --revision=" + pkgCm.Annotations["revision"])
+	if err != nil {
+		log.Printf("error: %v", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("stdout:" + stdout)
+
+	pkgCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
+	return nil
+}
+
+func proposeApprovePackage(pkgCm corev1.ConfigMap) error {
+	stdout, stderr, err := commandInShell("porchctl rpkg propose -n " + pkgCm.GetNamespace() + " " + pkgCm.Annotations["package-rev"])
+	if err != nil {
+		log.Printf("error: %v", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("stdout:" + stdout)
+	fmt.Println("stderr:" + stderr)
+
+	stdout, stderr, err = commandInShell("porchctl rpkg approve -n " + pkgCm.GetNamespace() + " " + pkgCm.Annotations["package-rev"])
+	if err != nil {
+		log.Printf("error: %v", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("stdout:" + stdout)
+	fmt.Println("stderr:" + stderr)
+	return nil
+}
+
+func pullCheckPackage(pkgCm corev1.ConfigMap, expectedYaml string) error {
+	pullDir, err := os.MkdirTemp("", "porch")
+	if err != nil {
+		log.Printf("error: %v", err)
+		return err
+	}
+
+	defer os.RemoveAll(pullDir)
+
+	pullPackagePath := pullDir + "/" + pkgCm.Annotations["package-name"]
+
+	_, stderr, err := commandInShell(
+		"porchctl rpkg pull " +
+			"-n " + pkgCm.GetNamespace() + " " +
+			pkgCm.Annotations["package-rev"] + " " +
+			pullPackagePath)
+	if err != nil {
+		log.Printf("error: %v\n", err)
+		log.Println(stderr)
+		return err
+	}
+
+	fmt.Println("package pulled to " + pullPackagePath)
+
+	testResourcePath := pullPackagePath + "/" + pkgCm.Annotations["resource-name"] + ".yaml"
+
+	yamlByteArrays, err := splitYamlFile(pullPackagePath + "/" + pkgCm.Annotations["resource-name"] + ".yaml")
+	if err != nil {
+		log.Fatalf("Failed to read yaml file %s : %v", testResourcePath, err)
+		return err
+	}
+
+	if len(yamlByteArrays) != 1 {
+		errMsg := fmt.Sprintf("Test resource file %s must contain 1 ConfigMap entry, it contains %d ConfigMap entries", testResourcePath, len(yamlByteArrays))
+		log.Fatalf(errMsg)
+		return errors.New(errMsg)
+	}
+
+	testConfigMap := corev1.ConfigMap{}
+
+	err = yaml.Unmarshal(yamlByteArrays[0], &testConfigMap)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to unmarshal test config map in resource file %s", testResourcePath)
+		log.Fatalf(errMsg)
+		return errors.New(errMsg)
+	}
+
+	if packagesAreEqual(pkgCm, testConfigMap) {
+		fmt.Println("Upgrade was successful, actual result matches the expected result")
+		return nil
+	} else {
+		errMsg := fmt.Sprintln(
+			"Upgrade failed, actual result does not match the expected result\n" +
+				"Expected result:\n" +
+				string(expectedYaml) + "\n" +
+				"Actual result:\n" +
+				string(yamlByteArrays[0]))
+
+		log.Fatalf(errMsg)
+		return errors.New(errMsg)
+	}
+}
+
+func deletePackage(ns string, packageRev string) {
+	stdout, stderr, _ := commandInShell("porchctl rpkg propose-delete -n " + ns + " " + packageRev)
+	fmt.Println("stdout:" + stdout)
+	fmt.Println("stderr:" + stderr)
+
+	stdout, stderr, _ = commandInShell("porchctl rpkg delete -n " + ns + " " + packageRev)
+	fmt.Println("stdout:" + stdout)
+	fmt.Println("stderr:" + stderr)
 }
 
 func splitYamlFile(file string) ([][]byte, error) {
@@ -105,132 +368,59 @@ func splitYamlFile(file string) ([][]byte, error) {
 	return yamlByteArrays, nil
 }
 
-func createBlueprint(bpCm corev1.ConfigMap) error {
-	stdout, stderr, err := commandInShell("porchctl rpkg init -n " + bpCm.GetNamespace() + " " + bpCm.Annotations["package-name"] + " --workspace v1 --repository management")
-	if err != nil {
-		log.Printf("error: %v", err)
-		log.Println(stderr)
-		return err
+func packagesAreEqual(pkgCm, testConfigMap corev1.ConfigMap) bool {
+	pkgCmNoAnnotation := pkgCm.DeepCopy()
+
+	deleteTestAnnotations(pkgCmNoAnnotation)
+	deleteTestAnnotations(&testConfigMap)
+
+	if pkgCmNoAnnotation.APIVersion != testConfigMap.APIVersion {
+		return false
 	}
 
-	fmt.Println("stdout:" + stdout)
-
-	bpCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
-	return nil
-}
-
-func pullPushPackage(bpCm corev1.ConfigMap) error {
-	pullDir, err := os.MkdirTemp("", "porch")
-	if err != nil {
-		log.Printf("error: %v", err)
-		return err
+	if pkgCmNoAnnotation.Kind != testConfigMap.Kind {
+		return false
 	}
 
-	defer os.RemoveAll(pullDir)
-
-	pullPackagePath := pullDir + "/" + bpCm.Annotations["package-name"]
-
-	_, stderr, err := commandInShell("porchctl rpkg pull -n " + bpCm.GetNamespace() + " " + bpCm.Annotations["package-rev"] + " " + pullPackagePath)
-	if err != nil {
-		log.Printf("error: %v\n", err)
-		log.Println(stderr)
-		return err
+	if pkgCmNoAnnotation.ObjectMeta.Name != testConfigMap.ObjectMeta.Name {
+		return false
 	}
 
-	fmt.Println("package pulled to " + pullPackagePath)
-
-	if err = addConfigMapToPackage(bpCm, pullPackagePath); err != nil {
-		return err
+	if pkgCmNoAnnotation.ObjectMeta.Namespace != testConfigMap.ObjectMeta.Namespace {
+		return false
 	}
 
-	_, stderr, err = commandInShell("porchctl rpkg push -n " + bpCm.GetNamespace() + " " + bpCm.Annotations["package-rev"] + " " + pullPackagePath)
-	if err != nil {
-		log.Printf("error: %v\n", err)
-		log.Println(stderr)
-		return err
+	if pkgCmNoAnnotation.ObjectMeta.GenerateName != testConfigMap.ObjectMeta.GenerateName {
+		return false
 	}
 
-	fmt.Println("package pushed from " + pullPackagePath)
-
-	return nil
-}
-
-func clonePackage(sourcePackageRev string, bpCm corev1.ConfigMap) error {
-	stdout, stderr, err := commandInShell(
-		"porchctl rpkg clone -n " + bpCm.GetNamespace() + " " + sourcePackageRev + " " + bpCm.Annotations["package-name"] + " --repository edge1 --workspace v1 --strategy " + bpCm.Annotations["clone-strategy"])
-	if err != nil {
-		log.Printf("error: %v", err)
-		log.Println(stderr)
-		return err
+	if pkgCmNoAnnotation.ObjectMeta.ResourceVersion != testConfigMap.ObjectMeta.ResourceVersion {
+		return false
 	}
 
-	fmt.Println("stdout:" + stdout)
-
-	bpCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
-	return nil
-}
-
-func copyPackage(sourcePackageRev string, bpCm corev1.ConfigMap) error {
-	stdout, stderr, err := commandInShell(
-		"porchctl rpkg copy -n " + bpCm.GetNamespace() + " " + sourcePackageRev + " --workspace v2 --replay-strategy=" + bpCm.Annotations["replay-strategy"])
-	if err != nil {
-		log.Printf("error: %v", err)
-		log.Println(stderr)
-		return err
+	if !reflect.DeepEqual(pkgCmNoAnnotation.ObjectMeta.Annotations, testConfigMap.ObjectMeta.Annotations) {
+		return false
 	}
 
-	fmt.Println("stdout:" + stdout)
-
-	bpCm.GetAnnotations()["package-rev"] = strings.Split(stdout, " ")[0]
-	return nil
-}
-
-func proposeApprovePackage(bpCm corev1.ConfigMap) error {
-	stdout, stderr, err := commandInShell("porchctl rpkg propose -n " + bpCm.GetNamespace() + " " + bpCm.Annotations["package-rev"])
-	if err != nil {
-		log.Printf("error: %v", err)
-		log.Println(stderr)
-		return err
+	if !reflect.DeepEqual(pkgCmNoAnnotation.ObjectMeta.Finalizers, testConfigMap.ObjectMeta.Finalizers) {
+		return false
 	}
 
-	fmt.Println("stdout:" + stdout)
-	fmt.Println("stderr:" + stderr)
-
-	stdout, stderr, err = commandInShell("porchctl rpkg approve -n " + bpCm.GetNamespace() + " " + bpCm.Annotations["package-rev"])
-	if err != nil {
-		log.Printf("error: %v", err)
-		log.Println(stderr)
-		return err
+	if !reflect.DeepEqual(pkgCmNoAnnotation.ObjectMeta.Labels, testConfigMap.ObjectMeta.Labels) {
+		return false
 	}
 
-	fmt.Println("stdout:" + stdout)
-	fmt.Println("stderr:" + stderr)
-	return nil
-}
-
-func deleteAllPackages(testConfigMaps [4]corev1.ConfigMap) {
-	for i := 0; i < 4; i++ {
-		pkgRevs := getPackageRevs4Package(testConfigMaps[i])
-
-		for _, pkgRev := range pkgRevs {
-			deletePackage(testConfigMaps[i].GetNamespace(), pkgRev)
-		}
-	}
-}
-
-func deletePackage(ns string, packageRev string) {
-	stdout, stderr, _ := commandInShell("porchctl rpkg propose-delete -n " + ns + " " + packageRev)
-	fmt.Println("stdout:" + stdout)
-	fmt.Println("stderr:" + stderr)
-
-	stdout, stderr, _ = commandInShell("porchctl rpkg delete -n " + ns + " " + packageRev)
-	fmt.Println("stdout:" + stdout)
-	fmt.Println("stderr:" + stderr)
+	return reflect.DeepEqual(pkgCmNoAnnotation.Data, testConfigMap.Data)
 }
 
 func getPackageRevs4Package(cm corev1.ConfigMap) []string {
 	pkgRevs := []string{}
-	stdout, _, err := commandInShell("porchctl rpkg list -n " + cm.GetNamespace() + "| grep ' " + cm.Annotations["package-name"] + "'")
+
+	if len(cm.Annotations["package-name"]) == 0 {
+		return pkgRevs
+	}
+
+	stdout, _, err := commandInShell("porchctl rpkg list -n " + cm.GetNamespace() + "| grep ' " + cm.Annotations["package-name"] + " '")
 
 	if err != nil {
 		fmt.Println("No packageRevs found")
@@ -250,21 +440,36 @@ func getPackageRevs4Package(cm corev1.ConfigMap) []string {
 	return pkgRevs
 }
 
-func addConfigMapToPackage(bpCm corev1.ConfigMap, pullPackagePath string) error {
-	cmYamlByteArray, err := yaml.Marshal(bpCm)
+func addConfigMapToPackage(pkgCm corev1.ConfigMap, pullPackagePath string) error {
+	pkgCmNoAnnotation := pkgCm.DeepCopy()
+	deleteTestAnnotations(pkgCmNoAnnotation)
+
+	cmYamlByteArray, err := yaml.Marshal(pkgCmNoAnnotation)
 	if err != nil {
 		log.Printf("error: %v", err)
-		fmt.Printf("Could not marshal ConfigMap into yaml\n%v\n", bpCm)
+		fmt.Printf("Could not marshal ConfigMap into yaml\n%v\n", pkgCmNoAnnotation)
 		return err
 	}
 
-	err = os.WriteFile(pullPackagePath+"/"+bpCm.Annotations["package-name"]+".yaml", cmYamlByteArray, 0644)
+	err = os.WriteFile(pullPackagePath+"/"+pkgCm.Annotations["resource-name"]+".yaml", cmYamlByteArray, 0644)
 	if err != nil {
 		log.Printf("error: %v", err)
-		fmt.Printf("Could not write ConfigMap to package at %s\n%v\n", pullPackagePath, bpCm)
+		fmt.Printf("Could not write ConfigMap to package at %s\n%v\n", pullPackagePath, pkgCm)
 		return err
 	}
 	return nil
+}
+
+func deleteTestAnnotations(pkgCmNoAnnotation *corev1.ConfigMap) {
+	delete(pkgCmNoAnnotation.Annotations, "package-name")
+	delete(pkgCmNoAnnotation.Annotations, "package-rev")
+	delete(pkgCmNoAnnotation.Annotations, "package-repo")
+	delete(pkgCmNoAnnotation.Annotations, "resource-name")
+	delete(pkgCmNoAnnotation.Annotations, "clone-strategy")
+	delete(pkgCmNoAnnotation.Annotations, "replay-strategy")
+	delete(pkgCmNoAnnotation.Annotations, "workspace")
+	delete(pkgCmNoAnnotation.Annotations, "revision")
+	delete(pkgCmNoAnnotation.Annotations, "internal.kpt.dev/upstream-identifier")
 }
 
 func commandInShell(command string) (string, string, error) {
