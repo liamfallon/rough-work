@@ -1,0 +1,10 @@
+--- test-resource.yaml
++++ test-resource.yaml
+@@ -2,6 +2,7 @@
+ data:
+   app-par-1: default-value-1
+   app-par-2: default-value-2
++  app-par-3: default-value-3
+ kind: ConfigMap
+ metadata:
+   creationTimestamp: null

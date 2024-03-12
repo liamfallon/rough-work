@@ -1,0 +1,58 @@
+apiVersion: porch.kpt.dev/v1alpha1
+kind: PackageRevision
+metadata:
+  creationTimestamp: "2024-03-08T12:53:19Z"
+  labels:
+    kpt.dev/latest-revision: "true"
+  name: edge1-d80ae0682a4f28528e138879d03fc400def8ae02
+  namespace: porch-demo
+  resourceVersion: dab94eb19cdfccefa12c73b4461ea284651d8a5c
+  uid: uid:deployed-network-function:v1
+spec:
+  lifecycle: Published
+  packageName: deployed-network-function
+  repository: edge1
+  revision: v1
+  tasks:
+  - clone:
+      strategy: resource-merge
+      upstreamRef:
+        upstreamRef:
+          name: management-8b80738a6e0707e3718ae1db3668d0b8ca3f1c82
+    type: clone
+  - eval:
+      config: null
+      image: render
+      match: {}
+    type: eval
+  - patch:
+      patches:
+      - contents: |
+          --- test-resource.yaml
+          +++ test-resource.yaml
+          @@ -7,5 +7,3 @@
+             creationTimestamp: null
+             name: my-nf
+             namespace: porch-demo
+          -  annotations:
+          -    internal.kpt.dev/upstream-identifier: '|ConfigMap|porch-demo|my-nf'
+        file: test-resource.yaml
+        patchType: PatchFile
+    type: patch
+  - eval:
+      config: null
+      image: render
+      match: {}
+    type: eval
+  workspaceName: v1
+status:
+  deployment: true
+  publishTimestamp: "2024-03-08T12:53:19Z"
+  publishedBy: porch@kpt.dev
+  upstreamLock:
+    git:
+      commit: 26c68519f0ee6ac51c66185486989536cbd190b2
+      directory: network-function
+      ref: network-function/v1
+      repo: http://172.18.255.200:3000/nephio/management.git
+    type: git

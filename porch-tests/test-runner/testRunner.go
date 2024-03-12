@@ -30,10 +30,9 @@ func ParseTestFile(testYamlFile string) (TestContext, error) {
 		return ctx, errors.New(errMsg)
 	}
 
-	testConfigMaps := []corev1.ConfigMap{}
-
 	for i := 0; i < 4; i++ {
-		err := yaml.Unmarshal(ctx.yamlByteArrays[i], &testConfigMaps[i])
+		ctx.testConfigMaps[i] = corev1.ConfigMap{}
+		err := yaml.Unmarshal(ctx.yamlByteArrays[i], &ctx.testConfigMaps[i])
 		if err != nil {
 			fmt.Println(err)
 			return ctx, err
@@ -49,7 +48,7 @@ func Run(ctx TestContext) {
 		return
 	}
 
-	err = pullPushPackage(ctx.testConfigMaps[0])
+	err = pullPushPackage(ctx.testConfigMaps[0], false)
 	if err != nil {
 		return
 	}
@@ -64,7 +63,7 @@ func Run(ctx TestContext) {
 		return
 	}
 
-	err = pullPushPackage(ctx.testConfigMaps[1])
+	err = pullPushPackage(ctx.testConfigMaps[1], true)
 	if err != nil {
 		return
 	}
@@ -79,7 +78,7 @@ func Run(ctx TestContext) {
 		return
 	}
 
-	err = pullPushPackage(ctx.testConfigMaps[2])
+	err = pullPushPackage(ctx.testConfigMaps[2], true)
 	if err != nil {
 		return
 	}
@@ -108,8 +107,6 @@ func Run(ctx TestContext) {
 	if err != nil {
 		return
 	}
-
-	DeleteAllPackages(ctx)
 }
 
 func DeleteAllPackages(ctx TestContext) {
@@ -142,7 +139,7 @@ func createBlueprint(pkgCm corev1.ConfigMap) error {
 	return nil
 }
 
-func pullPushPackage(pkgCm corev1.ConfigMap) error {
+func pullPushPackage(pkgCm corev1.ConfigMap, update bool) error {
 	pullDir, err := os.MkdirTemp("", "porch")
 	if err != nil {
 		log.Printf("error: %v", err)
@@ -166,7 +163,7 @@ func pullPushPackage(pkgCm corev1.ConfigMap) error {
 
 	fmt.Println("package pulled to " + pullPackagePath)
 
-	if err = addConfigMapToPackage(pkgCm, pullPackagePath); err != nil {
+	if err = updatePackageCm(pkgCm, pullPackagePath, update); err != nil {
 		return err
 	}
 
@@ -430,18 +427,39 @@ func getPackageRevs4Package(cm corev1.ConfigMap) []string {
 	return pkgRevs
 }
 
-func addConfigMapToPackage(pkgCm corev1.ConfigMap, pullPackagePath string) error {
-	pkgCmNoAnnotation := pkgCm.DeepCopy()
-	deleteTestAnnotations(pkgCmNoAnnotation)
+func updatePackageCm(pkgCm corev1.ConfigMap, pullPackagePath string, update bool) error {
+	outCm := pkgCm.DeepCopy()
+	deleteTestAnnotations(outCm)
 
-	cmYamlByteArray, err := yaml.Marshal(pkgCmNoAnnotation)
+	testResourceFile := pullPackagePath + "/" + pkgCm.Annotations["resource-name"] + ".yaml"
+
+	if update {
+		yamlFileByteArray, err := os.ReadFile(testResourceFile)
+		if err != nil {
+			fmt.Printf("Could not read resource file %s\n", testResourceFile)
+			return err
+		}
+
+		var pulledCm corev1.ConfigMap
+		err = yaml.Unmarshal(yamlFileByteArray, &pulledCm)
+		if err != nil {
+			fmt.Printf("Could not unmarshal resource file %s\n", testResourceFile)
+			return err
+		}
+
+		outCm.APIVersion = pulledCm.APIVersion
+		outCm.Kind = pulledCm.Kind
+		outCm.ObjectMeta = pulledCm.ObjectMeta
+	}
+
+	cmYamlByteArray, err := yaml.Marshal(outCm)
 	if err != nil {
 		log.Printf("error: %v", err)
-		fmt.Printf("Could not marshal ConfigMap into yaml\n%v\n", pkgCmNoAnnotation)
+		fmt.Printf("Could not marshal ConfigMap into yaml\n%v\n", outCm)
 		return err
 	}
 
-	err = os.WriteFile(pullPackagePath+"/"+pkgCm.Annotations["resource-name"]+".yaml", cmYamlByteArray, 0644)
+	err = os.WriteFile(testResourceFile, cmYamlByteArray, 0644)
 	if err != nil {
 		log.Printf("error: %v", err)
 		fmt.Printf("Could not write ConfigMap to package at %s\n%v\n", pullPackagePath, pkgCm)

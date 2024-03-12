@@ -1,0 +1,63 @@
+# Test Blueprint v1
+apiVersion: v1
+data:
+  app-par-1: "default-value-1"
+  app-par-2: "default-value-2"
+kind: ConfigMap
+metadata:
+  annotations:
+    resource-name: test-resource
+    package-name: network-function
+    package-repo: management
+    workspace: v1
+  name: my-nf
+  nameSpace: porch-demo
+---
+# Test Deployment v1
+apiVersion: v1
+data:
+  app-par-1: "default-value-1"
+  app-par-2: "default-value-2"
+kind: ConfigMap
+metadata:
+  annotations:
+    resource-name: test-resource
+    package-name: deployed-network-function
+    package-repo: edge1
+    workspace: v1
+    clone-strategy: fast-forward
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|porch-demo|my-nf'
+  name: my-nf
+  nameSpace: porch-demo
+---
+# Test Blueprint v2
+apiVersion: v1
+data:
+  app-par-1: "default-value-1"
+  app-par-2: "default-value-2"
+kind: ConfigMap
+metadata:
+  annotations:
+    resource-name: test-resource
+    package-name: network-function
+    workspace: v2
+    replay-strategy: "true"
+  name: my-nf
+  nameSpace: porch-demo
+---
+# Test Deployment v2
+apiVersion: v1
+data:
+  app-par-1: "default-value-1"
+  app-par-2: "default-value-2"
+kind: ConfigMap
+metadata:
+  annotations:
+    resource-name: test-resource
+    package-name: deployed-network-function
+    workspace: v2
+    revision: v2
+    replay-strategy: "true"
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|porch-demo|my-nf'
+  name: my-nf
+  nameSpace: porch-demo

@@ -1,0 +1,8 @@
+apiVersion: ""
+kind: KptRevisionMetadata
+metadata:
+  name: management-8b80738a6e0707e3718ae1db3668d0b8ca3f1c82
+  namespace: porch-demo
+  creationTimestamp: "2024-03-08T15:57:47Z"
+  resourceVersion: f0fddd1ddb7999a1923d2b126479d3612d0358e1
+  uid: uid:network-function:v1

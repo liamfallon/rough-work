@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  app-par-1: default-value-1
+  app-par-2: default-value-2
+kind: ConfigMap
+metadata: # kpt-merge: porch-demo/my-nf
+  creationTimestamp: null
+  name: my-nf
+  namespace: porch-demo

@@ -1,0 +1,68 @@
+apiVersion: porch.kpt.dev/v1alpha1
+kind: PackageRevision
+metadata:
+  creationTimestamp: "2024-03-08T12:53:21Z"
+  name: management-49580fc22bcf3bf51d334a00b6baa41df597219e
+  namespace: porch-demo
+  resourceVersion: 8ac7e823e8ea23ba39fd77816f54568a84818dab
+  uid: uid:network-function:main
+spec:
+  lifecycle: Published
+  packageName: network-function
+  repository: management
+  revision: main
+  tasks:
+  - init:
+      description: sample description
+    type: init
+  - eval:
+      config: null
+      image: render
+      match: {}
+    type: eval
+  - patch:
+      patches:
+      - contents: |
+          apiVersion: v1
+          data:
+            app-par-1: default-value-1
+            app-par-2: default-value-2
+          kind: ConfigMap
+          metadata:
+            creationTimestamp: null
+            name: my-nf
+            namespace: porch-demo
+        file: test-resource.yaml
+        patchType: CreateFile
+    type: patch
+  - eval:
+      config: null
+      image: render
+      match: {}
+    type: eval
+  - patch:
+      patches:
+      - contents: |
+          --- test-resource.yaml
+          +++ test-resource.yaml
+          @@ -2,6 +2,7 @@
+           data:
+             app-par-1: default-value-1
+             app-par-2: default-value-2
+          +  app-par-3: default-value-2
+           kind: ConfigMap
+           metadata:
+             creationTimestamp: null
+        file: test-resource.yaml
+        patchType: PatchFile
+    type: patch
+  - eval:
+      config: null
+      image: render
+      match: {}
+    type: eval
+  workspaceName: v2
+status:
+  publishTimestamp: "2024-03-08T12:53:21Z"
+  publishedBy: porch@kpt.dev
+  upstreamLock: {}

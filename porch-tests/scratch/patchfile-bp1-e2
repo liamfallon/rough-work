@@ -1,0 +1,8 @@
+--- test-resource.yaml
++++ test-resource.yaml
+@@ -7,5 +7,3 @@
+   creationTimestamp: null
+   name: my-nf
+   namespace: porch-demo
+-  annotations:
+-    internal.kpt.dev/upstream-identifier: '|ConfigMap|porch-demo|my-nf'
