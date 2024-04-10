@@ -148,11 +148,7 @@ func (ghr *GithubRecord) GetBody() string {
 }
 
 func (ghr *GithubRecord) GetComments() string {
-	if len(ghr.comments) == 0 {
-		return "Original issue comments: None\n"
-	}
-
-	var commentString = "Original issue comments:\n"
+	var commentString = ""
 
 	for _, comment := range ghr.comments {
 		if len(comment.commentBody) > 0 {
@@ -163,5 +159,10 @@ func (ghr *GithubRecord) GetComments() string {
 				"Comment body: " + comment.commentBody + "\n\n"
 		}
 	}
-	return commentString
+
+	if len(commentString) == 0 {
+		return "Original issue comments: None\n"
+	} else {
+		return "Original issue comments: \n" + commentString
+	}
 }
