@@ -6,6 +6,7 @@ import (
 	"liamfallon/rough-work/github-issues/types"
 	"log"
 	"os"
+	"strings"
 )
 
 func readCsvFile(filePath string) ([][]string, error) {
@@ -43,13 +44,21 @@ func writeCsvFile(filePath string, records [][]string) error {
 func main() {
 	types.IssueMap = make(map[string]*types.GithubRecord)
 
-	records, err := readCsvFile("/Users/liam/work/PorchIssues/Issues.csv")
+	records, err := readCsvFile("/Users/liam/work/PorchIssues/porch-issues.csv")
 	if err != nil {
 		return
 	}
 
 	for i := 1; i < len(records); i++ {
 		ghr := types.NewGithubRecord(records[i])
+
+		if !strings.Contains(ghr.GetLabels(), "area/porch") {
+			continue
+		}
+
+		if ghr.GetState() != "closed" {
+			continue
+		}
 
 		storedGhr, found := types.IssueMap[ghr.IssueUrl()]
 		if found {
@@ -70,7 +79,7 @@ func main() {
 		outRecords = append(outRecords, issue.OutStringArray())
 	}
 
-	writeCsvFile("/Users/liam/work/PorchIssues/OutIssues.csv", outRecords)
+	writeCsvFile("/Users/liam/work/PorchIssues/OutClosedIssues.csv", outRecords)
 
 	fmt.Printf("%d issues extracted\n", len(types.IssueMap))
 }

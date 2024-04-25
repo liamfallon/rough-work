@@ -19,6 +19,7 @@ type GithubRecord struct {
 	issueTitle           string
 	issueUserHtmlUrl     string
 	issueLabels          string
+	issueState           string
 	issueComments        string
 	issueCreatedAt       string
 	issueUpdatedAt       string
@@ -34,6 +35,7 @@ func NewGithubRecord(csvRecord []string) *GithubRecord {
 	ghr.issueTitle = csvRecord[9]
 	ghr.issueUserHtmlUrl = csvRecord[16]
 	ghr.issueLabels = csvRecord[28]
+	ghr.issueState = csvRecord[29]
 	ghr.issueComments = csvRecord[34]
 	ghr.issueCreatedAt = csvRecord[35]
 	ghr.issueUpdatedAt = csvRecord[36]
@@ -78,6 +80,10 @@ func (ghr *GithubRecord) Merge(inGhr *GithubRecord) error {
 	}
 	if ghr.issueLabels != inGhr.issueLabels {
 		err := errors.New("issueLabels not equal")
+		return err
+	}
+	if ghr.issueState != inGhr.issueState {
+		err := errors.New("issueState not equal")
 		return err
 	}
 	if ghr.issueComments != inGhr.issueComments {
@@ -141,10 +147,15 @@ func (ghr *GithubRecord) GetLabels() string {
 func (ghr *GithubRecord) GetBody() string {
 	return "Original issue URL: " + strings.ReplaceAll(strings.ReplaceAll(ghr.issueUrl, "api.github.com", "github.com"), "repos/kptdev", "kptdev") + "\n" +
 		"Original issue user: " + ghr.issueUserHtmlUrl + "\n" +
+		"Original issue state: " + ghr.issueState + "\n" +
 		"Original issue created at: " + ghr.issueCreatedAt + "\n" +
 		"Original issue last updated at: " + ghr.issueUpdatedAt + "\n" +
 		"Original issue body: " + ghr.issueBody + "\n\n" +
 		ghr.GetComments()
+}
+
+func (ghr *GithubRecord) GetState() string {
+	return ghr.issueState
 }
 
 func (ghr *GithubRecord) GetComments() string {
