@@ -1,0 +1,21 @@
+apiVersion: topology.nephio.org/v1alpha1
+kind: Template
+
+metadata:
+  name: upf
+
+spec:
+  templateId: nf/free5gc/upf:v1.0.0
+
+---
+
+apiVersion: topology.nephio.org/v1alpha1
+kind: Template
+
+metadata:
+  name: smf
+
+spec:
+  select:
+    metadata:
+      NetworkFunction.type: SMF

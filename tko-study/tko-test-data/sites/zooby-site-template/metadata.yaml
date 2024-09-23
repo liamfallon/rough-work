@@ -1,0 +1,10 @@
+apiVersion: metadata.nephio.org/v1alpha1
+kind: Site
+
+metadata:
+  name: zooby-cluster
+  description: "Zooby clusters are created from a Zooby template"
+
+spec:
+  provider: Kind
+  region: local

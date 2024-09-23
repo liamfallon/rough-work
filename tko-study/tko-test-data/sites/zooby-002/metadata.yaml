@@ -1,0 +1,9 @@
+apiVersion: metadata.nephio.org/v1alpha1
+kind: Site
+
+metadata:
+  name: zooby-cluster
+  cluster-name: zooby-002
+  info: "Second Zooby"
+  annotations:
+    nephio.org/merge: Override
